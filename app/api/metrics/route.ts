@@ -4,7 +4,7 @@ export async function GET() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const backend = process.env.BACKEND_URL || "http://gitops-dashboard-backend:8000";
+    const backend = process.env.BACKEND_URL || "http://localhost:8000";
     const response = await fetch(`${backend.replace(/\/$/, "")}/api/metrics`, {
       cache: "no-store", signal: controller.signal,
     });

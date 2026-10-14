@@ -1,3 +1,5 @@
+> Code fixes and deployment prerequisites: [deployment preparation](docs/deployment-preparation.md). Hosting has not been provisioned.
+
 <p align="center">
   <img src="docs/assets/gitops-pipeline.gif" alt="Animated GitOps delivery pipeline" width="100%" />
 </p>
@@ -10,8 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/frontend-ci.yml"><img src="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/frontend-ci.yml/badge.svg" alt="Frontend CI" /></a>
-  <a href="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/backend-ci.yml"><img src="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/backend-ci.yml/badge.svg" alt="Backend CI" /></a>
+  <a href="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/ci.yml"><img src="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/ci.yml/badge.svg" alt="Test and release" /></a>
   <img src="https://img.shields.io/badge/Kubernetes-kind-326CE5?logo=kubernetes&logoColor=white" alt="Kubernetes kind" />
   <img src="https://img.shields.io/badge/Argo_CD-GitOps-EF7B4D?logo=argo&logoColor=white" alt="Argo CD" />
   <img src="https://img.shields.io/badge/Prometheus-Metrics-E6522C?logo=prometheus&logoColor=white" alt="Prometheus" />
@@ -89,7 +90,7 @@ flowchart TD
 9. Prometheus scrapes backend HTTP metrics and Kubernetes resource metrics.
 10. The Metrics screen and Grafana display the collected measurements.
 
-> Argo CD synchronization is intentionally manual in the current version. Automated synchronization, pruning, and self-healing are planned improvements.
+> The checked-in Argo CD Application enables automated sync, pruning, and self-healing. After both images pass CI and are published, CI commits their full SHA tags to Helm. See [deployment preparation](docs/deployment-preparation.md) before enabling this on an existing cluster.
 
 ## Project screenshots
 
@@ -132,8 +133,7 @@ Grafana visualizes Kubernetes CPU and memory measurements for the frontend and b
 ```text
 .
 ├── .github/workflows/
-│   ├── frontend-ci.yml          # Frontend build and GHCR publishing
-│   └── backend-ci.yml           # Backend tests, build and GHCR publishing
+│   └── ci.yml                   # Tests, image builds and GitOps promotion
 ├── app/
 │   ├── api/                     # Server-side backend proxy routes
 │   ├── metrics-panel.tsx        # Prometheus metrics presentation
@@ -292,7 +292,7 @@ helm upgrade --install monitoring prometheus-community/kube-prometheus-stack `
   --namespace monitoring `
   --create-namespace `
   --kube-context kind-gitops-dev `
-  --values .\monitoring-values.yaml `
+  --values .\monitoring\values.yaml `
   --wait `
   --timeout 10m
 ```
@@ -361,7 +361,7 @@ The backend workflow:
 4. Builds with Docker Buildx.
 5. Publishes `gitops-dashboard-backend:dev` and `gitops-dashboard-backend:<commit-sha>`.
 
-The Helm chart currently deploys the `dev` tag with `imagePullPolicy: Always`. The SHA tags provide release traceability and are available for immutable deployment as a future enhancement.
+The Helm chart has separate `frontend.imageTag` and `backend.imageTag` values. They start at `dev` for compatibility; the first successful release workflow replaces both with the tested full commit SHA. Subsequent releases update Git so Argo CD detects a real Deployment change. Protected branches may require a repository-specific promotion policy; a rejected push fails visibly without forcing it.
 
 ## Security model
 
@@ -403,7 +403,7 @@ kubectl --context kind-gitops-dev describe pvc monitoring-grafana -n monitoring
 kubectl --context kind-gitops-dev get storageclass
 ```
 
-The StorageClass requested by `monitoring-values.yaml` must exist before Helm creates the PVC.
+The StorageClass requested by `monitoring/values.yaml` must exist before Helm creates the PVC.
 
 ### Metrics screen shows unavailable
 
@@ -430,7 +430,7 @@ Open `http://localhost:9090/targets` and confirm that the backend target is `UP`
 
 ## Roadmap
 
-- [ ] Deploy commit-SHA image tags directly from Helm.
+- [x] Deploy commit-SHA image tags directly from Helm after successful CI.
 - [ ] Enable Argo CD automated synchronization, pruning, and self-healing.
 - [ ] Provision project-specific Grafana dashboards directly from Git.
 - [ ] Configure Alertmanager notification delivery.

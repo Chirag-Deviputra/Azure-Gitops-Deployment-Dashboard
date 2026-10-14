@@ -1,0 +1,45 @@
+# Small development installation. Select a storage class supported by the host.
+alertmanager:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    retentionSize: 2GB
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    serviceMonitorSelector:
+      matchLabels:
+        release: monitoring
+    serviceMonitorNamespaceSelector: {}
+    ruleSelector:
+      matchLabels:
+        release: monitoring
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1536Mi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 5Gi
+grafana:
+  persistence:
+    enabled: true
+    size: 1Gi
+  deploymentStrategy:
+    type: Recreate
+  service:
+    type: ClusterIP

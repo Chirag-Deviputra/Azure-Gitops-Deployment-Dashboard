@@ -2,7 +2,9 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: gitops-dashboard-backend
-  namespace: monitoring
+  namespace: gitops-dev
+  labels:
+    release: monitoring
 spec:
   namespaceSelector:
     matchNames: [gitops-dev]
