@@ -3,12 +3,14 @@ kind: PrometheusRule
 metadata:
   name: gitops-dashboard-alerts
   namespace: monitoring
+  labels:
+    release: monitoring
 spec:
   groups:
     - name: gitops-dashboard
       rules:
         - alert: GitOpsDashboardHighErrorRate
-          expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+          expr: sum(rate(gitops_http_requests_total{namespace="gitops-dev",service="gitops-dashboard-backend",status_class="5xx"}[5m])) / sum(rate(gitops_http_requests_total{namespace="gitops-dev",service="gitops-dashboard-backend"}[5m])) > 0.05
           for: 10m
           labels: { severity: warning }
           annotations:

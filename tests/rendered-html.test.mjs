@@ -29,6 +29,6 @@ test("renders the GitOps deployment overview", async () => {
   const html = await response.text();
   assert.match(html, /<title>GitOps Deployment Dashboard<\/title>/);
   assert.match(html, /Deployment overview/);
-  assert.match(html, /Commit to cluster/);
+  assert.match(html, /Frontend and backend workloads/);
   assert.match(html, /gitops-dashboard/);
 });

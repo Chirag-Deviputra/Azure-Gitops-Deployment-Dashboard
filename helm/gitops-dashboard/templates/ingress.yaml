@@ -1,0 +1,25 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitops-dashboard
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  tls:
+    - hosts:
+        - {{ required "ingress.host is required" .Values.ingress.host | quote }}
+      secretName: {{ required "ingress.tlsSecretName is required" .Values.ingress.tlsSecretName | quote }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gitops-dashboard-frontend
+                port:
+                  name: http
+{{- end }}

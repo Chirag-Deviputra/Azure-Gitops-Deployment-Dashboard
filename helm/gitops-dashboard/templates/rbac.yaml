@@ -7,31 +7,6 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: gitops-dashboard-argocd-reader
-  namespace: argocd
-rules:
-  - apiGroups: ["argoproj.io"]
-    resources: ["applications"]
-    resourceNames: ["gitops-dashboard"]
-    verbs: ["get"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: gitops-dashboard-argocd-reader
-  namespace: argocd
-subjects:
-  - kind: ServiceAccount
-    name: gitops-dashboard-backend
-    namespace: {{ .Release.Namespace }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: gitops-dashboard-argocd-reader
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
   name: gitops-dashboard-workload-reader
   namespace: {{ .Release.Namespace }}
 rules:
