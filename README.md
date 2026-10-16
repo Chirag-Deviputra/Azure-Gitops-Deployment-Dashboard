@@ -1,442 +1,369 @@
-> Code fixes and deployment prerequisites: [deployment preparation](docs/deployment-preparation.md). Hosting has not been provisioned.
-
 <p align="center">
-  <img src="docs/assets/gitops-pipeline.gif" alt="Animated GitOps delivery pipeline" width="100%" />
+  <img src="https://raw.githubusercontent.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/main/docs/assets/gitops-pipeline.gif" alt="Animated GitOps delivery pipeline" width="100%" />
 </p>
 
-<h1 align="center">Azure GitOps Deployment Dashboard</h1>
+<h1 align="center">GitOps Deployment Dashboard</h1>
 
 <p align="center">
-  A full-stack, read-only operations dashboard for observing GitHub Actions releases,<br />
-  Argo CD application state, Kubernetes workloads, and Prometheus metrics from one interface.
+  <strong>From a Git commit to a running application on AWS.</strong><br />
+  A read-only dashboard for deployment health, Kubernetes workloads, and application metrics.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/ci.yml"><img src="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/ci.yml/badge.svg" alt="Test and release" /></a>
-  <img src="https://img.shields.io/badge/Kubernetes-kind-326CE5?logo=kubernetes&logoColor=white" alt="Kubernetes kind" />
-  <img src="https://img.shields.io/badge/Argo_CD-GitOps-EF7B4D?logo=argo&logoColor=white" alt="Argo CD" />
-  <img src="https://img.shields.io/badge/Prometheus-Metrics-E6522C?logo=prometheus&logoColor=white" alt="Prometheus" />
-  <img src="https://img.shields.io/badge/Grafana-Dashboards-F46800?logo=grafana&logoColor=white" alt="Grafana" />
+  <a href="https://gitops.3.108.53.79.sslip.io">Live demo</a> ·
+  <a href="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions">CI/CD runs</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#development-and-validation">Development</a>
 </p>
 
-## Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Project screenshots](#project-screenshots)
-- [Technology stack](#technology-stack)
-- [Application data](#application-data)
-- [Local setup](#local-setup)
-- [Monitoring installation](#monitoring-installation)
-- [Development and validation](#development-and-validation)
-- [CI/CD workflows](#cicd-workflows)
-- [Security model](#security-model)
-- [Troubleshooting](#troubleshooting)
-- [Current status](#current-status)
-- [Roadmap](#roadmap)
+<p align="center">
+  <a href="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/ci.yml"><img src="https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/ci.yml/badge.svg" alt="Test and release workflow status" /></a>
+  <img src="https://img.shields.io/badge/AWS-EC2-FF9900?style=flat-square" alt="AWS EC2" />
+  <img src="https://img.shields.io/badge/Kubernetes-K3s-326CE5?style=flat-square&logo=kubernetes&logoColor=white" alt="Kubernetes K3s" />
+  <img src="https://img.shields.io/badge/Argo_CD-GitOps-EF7B4D?style=flat-square&logo=argo&logoColor=white" alt="Argo CD" />
+  <img src="https://img.shields.io/badge/Prometheus-Metrics-E6522C?style=flat-square&logo=prometheus&logoColor=white" alt="Prometheus" />
+  <img src="https://img.shields.io/badge/Grafana-Observability-F46800?style=flat-square&logo=grafana&logoColor=white" alt="Grafana" />
+</p>
 
 ## Overview
 
-Azure GitOps Deployment Dashboard demonstrates an end-to-end container delivery and observability workflow. GitHub Actions tests the Next.js frontend and FastAPI backend, builds Docker images, and publishes them to GitHub Container Registry (GHCR). Argo CD compares the Helm configuration in Git with the Kubernetes cluster and deploys the requested version after synchronization.
+This project demonstrates a complete GitOps delivery workflow: validate application changes, publish container images, update the desired versions in Git, and let Argo CD reconcile Kubernetes with that configuration.
 
-The dashboard reads the live Argo CD Application and Kubernetes workload APIs through a restricted service account. It reports health, synchronization state, Git revision, deployment history, replica readiness, pod state, restart counts, desired images, and runtime image IDs. Prometheus supplies CPU, memory, request rate, p95 latency, and server-error measurements, while Grafana provides detailed time-series dashboards.
+The Next.js/React frontend presents live data from a FastAPI backend. The backend reads Argo CD application state, Kubernetes workloads, and Prometheus measurements using restricted access. Grafana provides deeper infrastructure and workload analysis.
 
-The current deployment target is a local `kind` cluster running on Docker Desktop. The project is structured so that AKS and other managed Kubernetes environments can be added later.
+Originally developed on a local **kind** cluster, the application is now deployed on **AWS EC2 running K3s**, with Traefik ingress and HTTPS managed by cert-manager and Let's Encrypt. The repository retains its original `Azure-Gitops-Deployment-Dashboard` name; the demonstrated cloud deployment is on AWS.
+
+> **Deployment snapshot — 16 October 2026:** Argo CD reported `Synced / Healthy`, both application pods were ready with zero restarts, and the monitoring stack had running pods and bound persistent volumes. This is a development/portfolio deployment on one EC2 instance, not a highly available production service.
+
+## Live demo
+
+**[Open the GitOps dashboard →](https://gitops.3.108.53.79.sslip.io)**
+
+| Resource | Link or access method |
+|---|---|
+| Application | https://gitops.3.108.53.79.sslip.io |
+| Source code | [GitHub repository](https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard) |
+| Delivery pipeline | [Test and release](https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard/actions/workflows/ci.yml) |
+| Grafana | Private access through an SSH tunnel and Kubernetes port-forward |
+| Argo CD | Administrative access through a private connection/port-forward |
+
+The demo uses an IP-based `sslip.io` hostname. Availability depends on the EC2 instance running. If its public IP changes, the hostname, ingress configuration, certificate, and demo links need updating.
 
 ## Features
 
-- Separate GitHub Actions workflows for frontend and backend testing, builds, and GHCR publishing.
-- Docker images published with both `dev` and full Git commit SHA tags.
-- Kubernetes resources packaged as a reusable Helm chart.
-- Argo CD health, sync status, revision, and successful deployment history.
-- Live frontend and backend replica, pod readiness, termination, and restart information.
-- Desired container tags and runtime image digest visibility.
-- FastAPI Prometheus instrumentation for request count, duration, and HTTP 5xx errors.
-- CPU and memory measurements for frontend and backend containers.
-- Grafana Kubernetes resource dashboards.
-- Read-only RBAC access for application and workload inspection.
-- Health and readiness probes for safe Kubernetes rollouts.
-- Windows launcher for starting the local environment and application port-forwards.
+- **Deployment visibility:** Argo CD health, sync state, Git revision, and successful synchronization history.
+- **Workload visibility:** desired replicas, pod readiness, container states, restarts, and terminating pods.
+- **Image traceability:** desired image tags and runtime image IDs.
+- **Application metrics:** request rate, p95 response latency, and HTTP 5xx error percentage.
+- **Resource metrics:** frontend and backend CPU usage and memory working sets.
+- **GitOps delivery:** tested commit-SHA images promoted through Helm values in Git.
+- **Secure transport:** HTTPS ingress with a certificate issued through cert-manager.
+- **Read-only operations:** restricted Kubernetes permissions and no dashboard mutation endpoints.
+- **Persistent monitoring:** Prometheus and Grafana volumes using K3s local-path storage.
 
 ## Architecture
 
+### Release and reconciliation
+
 ```mermaid
 flowchart TD
-    Developer[Developer push] --> GitHub[GitHub repository]
-    GitHub --> CI[GitHub Actions]
-    CI --> Tests[Build and tests]
-    Tests --> GHCR[GHCR images]
-    GitHub --> Argo[Argo CD]
-    GHCR --> Kubernetes[kind Kubernetes]
-    Argo --> Kubernetes
-    Kubernetes --> API[FastAPI status API]
-    Kubernetes --> Prometheus[Prometheus]
-    API --> Dashboard[Next.js dashboard]
-    Prometheus --> API
-    Prometheus --> Grafana[Grafana]
+    PR[Pull request] --> CI[GitHub Actions validation]
+    CI --> Merge[Merge to main]
+    Merge --> Build[Test and build images]
+    Build --> Registry[GHCR commit-SHA images]
+    Registry --> Promotion[Commit image tags to Helm values]
+    Promotion --> Argo[Argo CD reconciliation]
+    Argo --> Cluster[AWS EC2 / K3s workloads]
+    Registry -->|Image pulls| Cluster
 ```
 
-### Delivery flow
+### Application and observability
 
-1. A developer pushes frontend, backend, or infrastructure changes to `main`.
-2. The matching GitHub Actions workflow installs dependencies and runs its validation.
-3. Docker Buildx builds the application image.
-4. The workflow publishes `dev` and commit-SHA tags to GHCR.
-5. Argo CD compares `helm/gitops-dashboard` with the live `gitops-dev` namespace.
-6. The operator refreshes and synchronizes the Argo CD Application.
-7. Kubernetes rolls out the workload and evaluates readiness and liveness probes.
-8. The dashboard reads current application and workload status.
-9. Prometheus scrapes backend HTTP metrics and Kubernetes resource metrics.
-10. The Metrics screen and Grafana display the collected measurements.
+```mermaid
+flowchart TD
+    Browser[Browser] -->|HTTPS| Ingress[Traefik ingress]
+    Ingress --> Frontend[Next.js frontend]
+    Frontend -->|Server-side proxy| Backend[FastAPI backend]
+    Backend -->|Read-only requests| API[Kubernetes API / Argo CD Application]
+    Backend -->|Fixed PromQL queries| Prometheus[Prometheus]
+    Prometheus -->|Scrape metrics| Backend
+    Prometheus --> Exporters[Cluster and node metrics]
+    Grafana[Grafana] -->|Queries| Prometheus
+    Cert[cert-manager / Let's Encrypt] -->|TLS secret| Ingress
+```
 
-> The checked-in Argo CD Application enables automated sync, pruning, and self-healing. After both images pass CI and are published, CI commits their full SHA tags to Helm. See [deployment preparation](docs/deployment-preparation.md) before enabling this on an existing cluster.
-
-## Project screenshots
-
-### Argo CD application topology
-
-The Argo CD Application is Healthy and Synced. Its resource tree shows the frontend deployment, backend ServiceMonitor, RBAC objects, ReplicaSets, and pods managed from the Helm chart.
-
-![Argo CD application topology showing a Healthy and Synced GitOps dashboard](docs/screenshots/argocd-application.png)
-
-### Live deployment overview
-
-The application dashboard reads live Argo CD and Kubernetes data, including application state, Git revision, namespace, desired replicas, active pods, readiness, restarts, and deployed images.
-
-![GitOps dashboard overview showing live application and workload status](docs/screenshots/dashboard-overview.png)
-
-### Prometheus and Grafana monitoring
-
-Grafana visualizes Kubernetes CPU and memory measurements for the frontend and backend workloads in the `gitops-dev` namespace.
-
-![Grafana Kubernetes dashboard showing frontend and backend CPU usage](docs/screenshots/grafana-monitoring.png)
+The diagrams describe delivery and runtime relationships. The animated banner above is an illustrative pipeline, not a live status indicator.
 
 ## Technology stack
 
-| Area | Technology | Purpose |
-|---|---|---|
-| Frontend | Next.js, React, TypeScript | Responsive operations dashboard |
-| Backend | FastAPI, Python, HTTPX | Read-only status and monitoring API |
-| CI | GitHub Actions | Automated tests, builds, and image publishing |
-| Containers | Docker, Docker Buildx | Reproducible frontend and backend images |
-| Registry | GitHub Container Registry | Stores `dev` and commit-SHA image tags |
-| Orchestration | Kubernetes with kind | Runs the local application environment |
-| Packaging | Helm | Templates Deployments, Services, RBAC, and ServiceMonitor |
-| GitOps | Argo CD | Compares Git configuration with cluster state |
-| Metrics | Prometheus, kube-state-metrics, node-exporter | Collects application and cluster measurements |
-| Visualization | Grafana | Displays Kubernetes resource time series |
-| Local platform | Docker Desktop | Hosts the kind control-plane container |
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js, React, TypeScript, Tailwind CSS |
+| Backend | Python, FastAPI, HTTPX |
+| Validation and releases | GitHub Actions |
+| Container builds and registry | Docker Buildx, GitHub Container Registry |
+| Cloud host | AWS EC2, Ubuntu |
+| Kubernetes | K3s on AWS; kind for local development |
+| Packaging and reconciliation | Helm, Argo CD |
+| Ingress and certificates | Traefik, cert-manager, Let's Encrypt |
+| Observability | Prometheus, kube-state-metrics, node-exporter, Grafana |
+| Persistent storage | K3s local-path StorageClass |
 
-## Repository structure
+## CI/CD workflow
 
-```text
-.
-├── .github/workflows/
-│   └── ci.yml                   # Tests, image builds and GitOps promotion
-├── app/
-│   ├── api/                     # Server-side backend proxy routes
-│   ├── metrics-panel.tsx        # Prometheus metrics presentation
-│   └── page.tsx                 # Main operations dashboard
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI application and Kubernetes queries
-│   │   └── monitoring.py        # Prometheus instrumentation and queries
-│   ├── tests/                   # Health, workload, history, and metrics tests
-│   ├── Dockerfile
-│   └── requirements.txt
-├── components/                  # Shared dashboard UI components
-├── helm/gitops-dashboard/
-│   ├── templates/               # Deployments, Services, RBAC, ServiceMonitor
-│   ├── Chart.yaml
-│   └── values.yaml
-├── monitoring/                  # Prometheus rules and Grafana dashboard definitions
-├── scripts/                     # Build verification and support scripts
-├── Dockerfile                   # Frontend image
-├── Start-GitOps.bat             # Local Windows environment launcher
-└── README.md
+The repository uses one workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml), named **Test and release**.
+
+| Stage | What it does |
+|---|---|
+| Frontend | Installs dependencies, runs lint, type checking, and tests including a production build |
+| Backend | Installs Python dependencies and runs pytest |
+| Manifests | Lints Helm and renders the default chart plus monitoring/ingress configuration |
+| Images | Builds frontend and backend images after validation passes |
+| Publish | Publishes full commit-SHA and `dev` tags for qualifying runs on `main` |
+| Promote | Commits tested image tags into `helm/gitops-dashboard/values.yaml` |
+| Reconcile | Argo CD detects the Git change and rolls out the desired versions |
+
+Pull requests validate and build images without publishing or promoting them. After merge, the `main` workflow publishes images and updates Git. Promotion skips an older build if `main` has advanced; a conflicting push fails without forcing it. Repository rules must permit the intended promotion policy.
+
+Kubernetes deploys the SHA tags recorded in Helm values. The mutable `dev` tag is also published but is not the version used by the promotion step.
+
+## AWS deployment configuration
+
+The working cloud environment uses these settings:
+
+| Setting | Deployed value |
+|---|---|
+| AWS region | Mumbai (`ap-south-1`) |
+| Cluster | Single-node K3s on EC2 |
+| Application namespace | `gitops-dev` |
+| Argo CD Application | `argocd/gitops-dashboard` |
+| Source | `main`, path `helm/gitops-dashboard` |
+| Replicas | One frontend and one backend |
+| Ingress class | `traefik` |
+| Host | `gitops.3.108.53.79.sslip.io` |
+| TLS secret | `gitops-dashboard-tls` |
+| Monitoring release / namespace | `monitoring` / `monitoring` |
+| Automated sync | Enabled, with self-healing |
+| Automated pruning | Disabled in the deployed AWS Application |
+
+**Repository defaults differ from the deployed AWS overrides.** The chart defaults to two replicas and disabled ingress/monitoring. The checked-in Argo CD Application uses project `gitops-dashboard` and enables pruning; the AWS Application was created in project `default` with pruning disabled. Preserve the intended environment configuration when reconciling these files.
+
+The AWS Helm overrides correspond to:
+
+```yaml
+frontend:
+  replicas: 1
+backend:
+  replicas: 1
+monitoring:
+  enabled: true
+ingress:
+  enabled: true
+  className: traefik
+  host: gitops.3.108.53.79.sslip.io
+  tlsSecretName: gitops-dashboard-tls
 ```
 
-## Application data
+These are application settings, not a complete cluster bootstrap. K3s, Argo CD, monitoring CRDs, cert-manager, the certificate issuer, and cross-namespace RBAC must already be configured. A separate deployment needs its own hostname and certificate.
 
-### Argo CD and Kubernetes status
+### Verify the existing AWS environment
 
-`GET /api/applications` returns:
+Run on the EC2 host:
 
-- Application name and destination namespace.
-- Argo CD health and synchronization state.
-- Current Git revision.
-- Successful synchronization history and initiator.
-- Desired, active, ready, and terminating pod counts.
-- Pod phases, container states, readiness, and restarts.
-- Desired image names and runtime image IDs.
+```bash
+sudo k3s kubectl get nodes
+sudo k3s kubectl get application gitops-dashboard -n argocd
+sudo k3s kubectl get pods -n gitops-dev
+sudo k3s kubectl get ingress,certificate -n gitops-dev
+sudo k3s kubectl get pods,pvc -n monitoring
+sudo k3s kubectl get servicemonitor -n gitops-dev
+```
 
-The backend reads only the configured `gitops-dashboard` Application and the two dashboard Deployments. Kubernetes RBAC restricts the service account to the required read operations.
+Expected results: a ready node, a `Synced / Healthy` Application, ready application pods, a ready TLS certificate, and bound monitoring PVCs.
 
-### Monitoring status
+## Monitoring
 
-`GET /api/metrics` queries Prometheus with fixed, server-controlled PromQL expressions and returns:
+The monitoring stack is installed using `prometheus-community/kube-prometheus-stack` and [`monitoring/values.yaml`](monitoring/values.yaml).
 
-| Measurement | Description |
+| Component | Configuration |
 |---|---|
-| Scrape health | Whether Prometheus can scrape the backend ServiceMonitor target |
-| Request rate | `/api/applications` responses per second over five minutes |
-| p95 latency | Estimated 95th percentile backend response duration |
-| Server errors | HTTP 5xx responses as a percentage of API requests |
-| CPU | Five-minute average CPU usage for each workload |
-| Memory | Current container working-set memory for each workload |
+| Backend ServiceMonitor | `/metrics` on named service port `http` |
+| Scrape interval / timeout | 30 seconds / 10 seconds |
+| ServiceMonitor selector | `release: monitoring` |
+| Prometheus retention | Two days, with a 2 GB retention-size limit |
+| Prometheus volume | 5 GiB, local-path storage |
+| Grafana volume | 1 GiB, local-path storage |
+| Alertmanager | Disabled in the development configuration |
 
-Missing samples are returned as unavailable values rather than fabricated zeroes. Application status and monitoring are fetched independently, so a Prometheus problem does not hide the last Kubernetes connection error.
+Persistent local-path volumes survive ordinary pod replacement but remain tied to the node's storage. They do not provide off-instance backups or multi-node failover.
 
-### Backend endpoints
+### Private Grafana access
 
-| Endpoint | Purpose |
+On the EC2 host, keep this command running:
+
+```bash
+sudo k3s kubectl port-forward -n monitoring svc/monitoring-grafana 3002:80 --address 127.0.0.1
+```
+
+In MobaXterm, create a local SSH tunnel using your EC2 key:
+
+| Tunnel field | Value |
 |---|---|
-| `GET /health` | Backend liveness probe |
-| `GET /ready` | Backend readiness probe |
-| `GET /metrics` | Prometheus exposition endpoint |
-| `GET /api/applications` | Live Argo CD and workload state |
-| `GET /api/metrics` | Aggregated Prometheus measurements |
+| Local port | `3002` |
+| Remote destination | `127.0.0.1` |
+| Remote port | `3002` |
+| SSH server | Your EC2 public IP |
+| SSH username | `ubuntu` |
+| SSH port | `22` |
 
-## Prerequisites
+Start the tunnel and visit **http://localhost:3002**. The browser address works only while both the tunnel and port-forward are active. Use the credentials belonging to this Grafana installation.
 
-- Windows 10 or 11
-- Docker Desktop using Linux containers
-- Git
-- `kubectl`
-- `kind`
-- Helm 3
-- Node.js 22 and npm for direct frontend development
-- Python 3.13 for direct backend development
+## API and security model
 
-Docker Desktop must be running before the kind cluster starts.
+| Backend endpoint | Purpose |
+|---|---|
+| `GET /health` | Liveness probe |
+| `GET /ready` | Readiness probe |
+| `GET /metrics` | Prometheus exposition |
+| `GET /api/applications` | Argo CD and workload state |
+| `GET /api/metrics` | Aggregated monitoring measurements |
 
-## Local setup
+The browser uses same-origin frontend API routes. The backend communicates with Kubernetes through the `gitops-dashboard-backend` service account.
 
-### 1. Clone the repository
+- Namespaced RBAC permits reads of the named frontend/backend Deployments and listing pods in the workload namespace.
+- A separate Role and RoleBinding in `argocd` permit `get` on the named `gitops-dashboard` Application.
+- Pod filtering happens in application queries; namespace-level pod-list permission is not restricted to individual pod names by RBAC.
+- The dashboard provides no resource mutation, synchronization, deletion, or rollback API.
+- PromQL expressions are controlled by the server, and missing samples are represented as unavailable values.
+- HTTPS protects traffic in transit; it does not itself provide user authentication. Identity-aware access remains a future improvement.
 
-```powershell
+## Repository guide
+
+| Path | Purpose |
+|---|---|
+| `app/` | Dashboard pages and server-side API routes |
+| `components/` | Shared UI components |
+| `backend/app/` | FastAPI application and monitoring integration |
+| `backend/tests/` | Backend automated tests |
+| `tests/` | Frontend/build tests |
+| `.github/workflows/ci.yml` | Unified validation and release workflow |
+| `helm/gitops-dashboard/` | Helm chart and desired image versions |
+| `argocd/` | Application and project definitions |
+| `monitoring/` | Monitoring values and supporting definitions |
+| `scripts/` | Build verification and image promotion scripts |
+| `docs/` | Architecture, preparation notes, and visual assets |
+| `Dockerfile` | Frontend container build |
+| `backend/Dockerfile` | Backend container build |
+| `Start-GitOps.bat` | Existing local kind environment launcher |
+
+## Development and validation
+
+Clone the repository:
+
+```bash
 git clone https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard.git
-cd .\Azure-Gitops-Deployment-Dashboard
+cd Azure-Gitops-Deployment-Dashboard
 ```
 
-### 2. Create the local cluster
+Use Node.js 22 (at least 22.13), Python 3.13, Docker, and Helm. The following commands target Linux or WSL because the npm scripts use Bash.
 
-Create the cluster once if it does not exist:
+### Frontend
 
-```powershell
-kind create cluster --name gitops-dev
-kubectl --context kind-gitops-dev create namespace gitops-dev
-kubectl --context kind-gitops-dev create namespace argocd
+```bash
+npm ci
+npm run lint
+npm run typecheck
+npm test
 ```
 
-Install Argo CD:
+`npm test` includes the verified production build and Node.js tests. For container validation:
 
-```powershell
-kubectl --context kind-gitops-dev apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-kubectl --context kind-gitops-dev rollout status deployment/argocd-server -n argocd --timeout=300s
+```bash
+docker build -t gitops-dashboard-frontend:check .
 ```
 
-Create the `gitops-dashboard` Application in Argo CD using:
+### Backend
 
-| Field | Value |
-|---|---|
-| Repository | `https://github.com/Chirag-Deviputra/Azure-Gitops-Deployment-Dashboard.git` |
-| Revision | `main` |
-| Path | `helm/gitops-dashboard` |
-| Cluster | `https://kubernetes.default.svc` |
-| Namespace | `gitops-dev` |
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+PYTHONPATH=backend python -m pytest backend/tests
+```
 
-Refresh and synchronize the Application after both CI workflows publish their images.
+### Helm
 
-### 3. Start the existing environment
+```bash
+helm lint helm/gitops-dashboard
+helm template gitops-dashboard helm/gitops-dashboard --namespace gitops-dev
+helm template gitops-dashboard helm/gitops-dashboard \
+  --namespace gitops-dev \
+  --set monitoring.enabled=true \
+  --set ingress.enabled=true \
+  --set ingress.className=traefik \
+  --set ingress.host=dashboard.example.com \
+  --set ingress.tlsSecretName=dashboard-tls
+```
 
-After the cluster has been created and the application has been synchronized, run:
+Rendering validates templates without deploying resources. A working application requires the Kubernetes, Argo CD, and monitoring integrations described above.
+
+### Existing local kind environment
+
+The original Windows development environment remains useful for local testing. With Docker Desktop running and the `kind-gitops-dev` cluster already configured, start the launcher:
 
 ```powershell
 .\Start-GitOps.bat
 ```
 
-The launcher starts the existing kind control-plane container, waits for Kubernetes and the application Deployments, starts the configured port-forwards, and opens the local interfaces.
-
-### 4. Local addresses
-
-| Service | Address |
-|---|---|
-| GitOps dashboard | `http://localhost:3001` |
-| Backend readiness | `http://localhost:8001/ready` |
-| Backend application API | `http://localhost:8001/api/applications` |
-| Argo CD | `https://localhost:8080` |
-| Grafana | `http://localhost:3002` |
-| Prometheus | `http://localhost:9090` |
-
-Grafana and Prometheus can be forwarded in separate PowerShell windows:
-
-```powershell
-kubectl --context kind-gitops-dev port-forward -n monitoring svc/monitoring-grafana 3002:80
-```
-
-```powershell
-kubectl --context kind-gitops-dev port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
-```
-
-## Monitoring installation
-
-The local stack uses `prometheus-community/kube-prometheus-stack` in the `monitoring` namespace. The values limit local resource consumption, retain Prometheus data for two days, persist Grafana and Prometheus data, and select application ServiceMonitors carrying `release: monitoring`.
-
-```powershell
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-
-helm upgrade --install monitoring prometheus-community/kube-prometheus-stack `
-  --namespace monitoring `
-  --create-namespace `
-  --kube-context kind-gitops-dev `
-  --values .\monitoring\values.yaml `
-  --wait `
-  --timeout 10m
-```
-
-The current kind environment uses a `local-path` StorageClass backed by `rancher.io/local-path`. Verify it before installation:
-
-```powershell
-kubectl --context kind-gitops-dev get storageclass
-```
-
-Verify the monitoring workloads:
-
-```powershell
-kubectl --context kind-gitops-dev get pods,pvc -n monitoring
-kubectl --context kind-gitops-dev get servicemonitor gitops-dashboard-backend -n gitops-dev
-Invoke-RestMethod http://localhost:3001/api/metrics | ConvertTo-Json -Depth 6
-```
-
-## Development and validation
-
-### Frontend
-
-```powershell
-npm ci
-docker build -t gitops-frontend-check .
-```
-
-The Docker build is the recommended Windows validation because the repository's verified build script uses Bash inside its Linux build environment.
-
-### Backend
-
-```powershell
-docker build -t gitops-backend-check .\backend
-docker run --rm --entrypoint python -v "${PWD}/backend/tests:/app/tests:ro" gitops-backend-check -m pytest /app/tests -q
-```
-
-The latest verified backend suite contains 18 passing tests covering health probes, Argo CD history, workload summaries, partial failures, instrumentation, Prometheus response validation, and monitoring errors.
-
-### Helm
-
-```powershell
-git diff --check
-helm lint .\helm\gitops-dashboard
-helm template gitops-dashboard .\helm\gitops-dashboard --namespace gitops-dev
-```
-
-## CI/CD workflows
-
-### Frontend CI
-
-The frontend workflow runs for relevant pull requests and pushes to `main`. It:
-
-1. Installs Node.js 22 dependencies with `npm ci`.
-2. Runs the verified production build.
-3. Authenticates to GHCR for pushes.
-4. Builds with Docker Buildx.
-5. Publishes `gitops-dashboard-frontend:dev` and `gitops-dashboard-frontend:<commit-sha>`.
-
-### Backend CI
-
-The backend workflow:
-
-1. Installs Python 3.13 dependencies.
-2. Runs the complete pytest suite.
-3. Authenticates to GHCR for pushes.
-4. Builds with Docker Buildx.
-5. Publishes `gitops-dashboard-backend:dev` and `gitops-dashboard-backend:<commit-sha>`.
-
-The Helm chart has separate `frontend.imageTag` and `backend.imageTag` values. They start at `dev` for compatibility; the first successful release workflow replaces both with the tested full commit SHA. Subsequent releases update Git so Argo CD detects a real Deployment change. Protected branches may require a repository-specific promotion policy; a rejected push fails visibly without forcing it.
-
-## Security model
-
-- The browser calls same-origin Next.js API routes instead of connecting directly to Kubernetes.
-- The backend runs under the `gitops-dashboard-backend` Kubernetes service account.
-- RBAC grants read access only to the named Argo CD Application, dashboard Deployments, and matching pods required by this interface.
-- The dashboard does not expose synchronize, delete, rollback, or resource-mutation endpoints.
-- Prometheus queries are fixed on the server; browser input is not inserted into PromQL.
-- Kubernetes service-account tokens and Grafana credentials are never returned to the frontend.
+Typical local ports are dashboard `3001`, backend `8001`, Argo CD `8080`, Grafana `3002`, and Prometheus `9090`. Avoid reusing a local port already occupied by an AWS SSH tunnel.
 
 ## Troubleshooting
 
-### Launcher keeps waiting for Kubernetes
+| Symptom | First checks |
+|---|---|
+| Argo CD is OutOfSync | Inspect the differing resources and desired Helm values before syncing or pruning |
+| Pod is not ready | Describe the pod, inspect events, then check container logs |
+| ImagePullBackOff | Verify the GHCR image/tag and access permissions |
+| Metrics unavailable | Check the ServiceMonitor label, Prometheus target health, and backend logs; allow time for new samples |
+| Grafana PVC Pending | Check the requested StorageClass and available node disk space |
+| Grafana unavailable locally | Verify both port-forward and SSH tunnel are running and local port 3002 is free |
+| HTTPS endpoint unavailable | Check DNS/public IP, EC2 networking, Traefik, ingress host, and certificate readiness |
 
-Confirm Docker Desktop is using Linux containers and inspect the kind node:
+Useful read-only diagnostics on EC2:
 
-```powershell
-docker ps -a --filter "name=gitops-dev-control-plane"
-kubectl --context kind-gitops-dev get nodes
+```bash
+sudo k3s kubectl get events -n gitops-dev --sort-by=.lastTimestamp
+sudo k3s kubectl logs deployment/gitops-dashboard-frontend -n gitops-dev --tail=60
+sudo k3s kubectl logs deployment/gitops-dashboard-backend -n gitops-dev --tail=60
+sudo k3s kubectl describe certificate gitops-dashboard-tls -n gitops-dev
 ```
 
-If Docker reports a Windows socket or excluded-port error, restart Docker Desktop and Windows before deleting the cluster. The launcher preserves the existing cluster when startup fails.
+## Milestones and next steps
 
-### `ImagePullBackOff`
-
-Inspect events and verify the GHCR owner and tag:
-
-```powershell
-kubectl --context kind-gitops-dev get events -n gitops-dev --sort-by=.lastTimestamp | Select-Object -Last 20
-kubectl --context kind-gitops-dev get deployment -n gitops-dev -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'
-```
-
-The configured registry owner is `ghcr.io/chirag-deviputra`. Public packages can be pulled anonymously; private packages require a Kubernetes image pull secret.
-
-### Grafana PVC remains Pending
-
-```powershell
-kubectl --context kind-gitops-dev describe pvc monitoring-grafana -n monitoring
-kubectl --context kind-gitops-dev get storageclass
-```
-
-The StorageClass requested by `monitoring/values.yaml` must exist before Helm creates the PVC.
-
-### Metrics screen shows unavailable
-
-```powershell
-kubectl --context kind-gitops-dev get servicemonitor gitops-dashboard-backend -n gitops-dev
-kubectl --context kind-gitops-dev logs deployment/gitops-dashboard-backend -n gitops-dev --tail=60
-```
-
-Open `http://localhost:9090/targets` and confirm that the backend target is `UP`. A new deployment normally needs two 30-second scrapes before five-minute rate queries return values.
-
-## Current status
-
-- [x] Frontend and backend CI workflows
-- [x] Docker builds and GHCR publishing
-- [x] Helm Kubernetes packaging
-- [x] Argo CD application health and manual synchronization
-- [x] Read-only Kubernetes RBAC
-- [x] Live pod and container image information
-- [x] Argo CD deployment history
-- [x] Prometheus application instrumentation
-- [x] CPU, memory, traffic, latency, and error metrics
-- [x] Grafana Kubernetes dashboards
-- [x] Backend automated tests
-
-## Roadmap
-
-- [x] Deploy commit-SHA image tags directly from Helm after successful CI.
-- [ ] Enable Argo CD automated synchronization, pruning, and self-healing.
-- [ ] Provision project-specific Grafana dashboards directly from Git.
-- [ ] Configure Alertmanager notification delivery.
-- [ ] Add Terraform for an Azure Kubernetes Service environment.
-- [ ] Add ingress, TLS, and identity-aware access for a shared environment.
+- [x] Local kind deployment and Kubernetes troubleshooting
+- [x] Frontend/backend validation and container builds
+- [x] GHCR publishing with commit-SHA tags
+- [x] Automated image promotion through Git
+- [x] AWS EC2 deployment with K3s and Argo CD
+- [x] HTTPS ingress and certificate issuance
+- [x] Read-only application and workload visibility
+- [x] Prometheus metrics and Grafana access
+- [x] Persistent monitoring volumes
+- [ ] Commit the complete AWS bootstrap and environment overrides to Git
+- [ ] Establish a stable public address and a custom domain
+- [ ] Add identity-aware access for shared use
+- [ ] Configure alert notification delivery
+- [ ] Add backups and document restore procedures
+- [ ] Pin and document infrastructure/chart versions for reproducible rebuilds
+- [ ] Automate AWS infrastructure provisioning
 
 ## Author
 
-Built by [Chirag Deviputra](https://github.com/Chirag-Deviputra) as an intermediate DevOps portfolio project demonstrating CI/CD, containers, Kubernetes, GitOps, RBAC, observability, and operational troubleshooting.
+Built by **[Chirag Deviputra](https://github.com/Chirag-Deviputra)** to demonstrate CI/CD, containers, Kubernetes, GitOps, cloud deployment, RBAC, and observability through a working application.
+
+---
+
+<p align="center">
+  <strong>Commit → Validate → Publish → Reconcile → Observe</strong><br />
+  <a href="https://gitops.3.108.53.79.sslip.io">Explore the live dashboard</a>
+</p>
