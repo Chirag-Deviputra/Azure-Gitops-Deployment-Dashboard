@@ -81,7 +81,7 @@ export default function Home() {
       <div className="brand-mark"><div className="brand-icon"><GitBranch /></div><div><strong>GitOps</strong><span>CONTROL</span></div></div>
       <div className="nav-label">WORKSPACE</div>
       <nav className="primary-nav" aria-label="Workspace">{nav.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${view === label ? "active" : ""}`} aria-current={view === label ? "page" : undefined} title={label} onClick={() => { setView(label); window.scrollTo({ top: 0 }); }}><Icon /><span>{label}</span>{view === label && <span className="nav-pip" />}</button>)}</nav>
-      <div className="sidebar-foot"><div className="cluster-chip"><Boxes /><div><strong>gitops-dev</strong><span>Local kind environment</span></div></div></div>
+      <div className="sidebar-foot"><div className="cluster-chip"><Boxes /><div><strong>gitops-dev</strong><span>AWS EC2 / K3s</span></div></div></div>
     </aside>
     <section className="content-panel">
       <header className="topbar"><div><p className="eyebrow">DEVELOPMENT ENVIRONMENT</p><h1>{titles[view]}</h1></div><div className="topbar-actions"><Badge className="environment-badge" variant="outline">dev</Badge><Button className="sync-button" disabled={refreshing} onClick={() => setRefreshKey((key) => key + 1)}><RefreshCw className={refreshing ? "animate-spin" : ""} />{refreshing ? "Refreshing…" : "Refresh status"}</Button></div></header>
