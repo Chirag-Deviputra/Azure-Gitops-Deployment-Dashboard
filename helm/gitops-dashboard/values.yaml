@@ -1,11 +1,11 @@
 image:
   registry: ghcr.io/chirag-deviputra
 frontend:
-  imageTag: "4aa8e45cd20840885bde1b7b00ecb56c03b61751"
+  imageTag: "a6e99d8b5228bc0a85bb00b7274cf518a41598ce"
   replicas: 2
   port: 3000
 backend:
-  imageTag: "4aa8e45cd20840885bde1b7b00ecb56c03b61751"
+  imageTag: "a6e99d8b5228bc0a85bb00b7274cf518a41598ce"
   replicas: 2
   port: 8000
 resources:
